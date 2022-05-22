@@ -1,0 +1,106 @@
+---
+- name: upgrade all packages
+  apt:
+   update_cache: yes
+- name: install java  
+  apt:
+    name: openjdk-8-jre-headless
+    state: present
+# - name: downloading kafka binaries
+#   get_url:
+#    url: "{{ kafka_binaries_url }}"
+#    dest: /home/ubuntu
+
+- name: installing and extracting the binaries
+  unarchive:
+    dest: /home/ubuntu
+    src: "{{ kafka_binaries_url }}"
+    remote_src: yes
+
+- name: Create a data directory
+  file:
+    path: "{{ kafka_binaries_location }}/data"
+    state: directory
+
+- name: Create Zookeeper and kafka
+  file:
+    path: "{{ kafka_binaries_location}}/data/{{ item }}"
+    state: directory
+  loop: "{{ directories }}"
+
+- name: creating id file
+  file: 
+     path: "{{ kafka_binaries_location }}/data/zookeeper/myid"
+     state: touch
+
+- name: Adding an id to broker one
+  lineinfile:
+    path: "{{ kafka_binaries_location }}/data/zookeeper/myid"
+    state: present
+    line: "{{ ansible_loop.index }}"
+  loop: "{{ nodes }}"
+  loop_control:
+    extended: yes
+  when: ansible_nodename == item
+
+- name: specifing dataDir property to point to the newly created data directory 
+  lineinfile:
+    path: "{{ kafka_binaries_location }}/config/zookeeper.properties"
+    regexp: '^dataDir='
+    line:  'dataDir={{ kafka_binaries_location }}/data/zookeeper'
+
+- name: Adding ips of the brokers in nodees
+  blockinfile:
+   path: "{{ kafka_binaries_location }}/config/zookeeper.properties"
+   state: present
+   block: | 
+    {{ ips_blocks[ ansible_loop.index0 ]}} 
+  when: ansible_nodename == item
+  loop: "{{ nodes }}"
+  loop_control:
+    extended: yes
+
+- name: specifing logDir property to point to the newly created kafka under the data directory
+  lineinfile:
+    path: "{{ kafka_binaries_location }}/config/server.properties"
+    regexp: '^log.dirs='
+    line: 'log.dirs={{ kafka_binaries_location }}/data/kafka'
+  
+- name: Add id of broker in server configuration
+  lineinfile:
+    path: "{{ kafka_binaries_location }}/config/server.properties"
+    state: present
+    regexp: '^broker.id='
+    line: "broker.id={{ ansible_loop.index }}"
+  loop: "{{ nodes }}"
+  loop_control:
+    extended: yes
+  when: ansible_nodename == item
+
+- name: Adding the ips of the servers to config/server.properties
+  lineinfile:
+    path: "{{ kafka_binaries_location }}/config/server.properties"
+    state: present
+    regexp: '^zookeeper.connect='
+    line: 'zookeeper.connect={{ ipsOfInstances }}'
+- name: Change Specs for low specs machines
+  lineinfile:
+    path: "{{ kafka_binaries_location }}/bin/kafka-server-start.sh"
+    state: present
+    regexp: 'export KAFKA_HEAP_OPTS='
+    line:  'export KAFKA_HEAP_OPTS="-Xmx500M -Xms500M"'
+    
+- name: copy the zookeeper and kafka service file
+  copy:
+    src: "{{ item }}"
+    dest: /etc/systemd/system
+    owner: root
+    group: root
+  notify:
+    - "start {{ item }}"
+  loop: "{{ services }}"
+  
+  # vi bin/kafka-server-start.sh 
+  # if [ "x$KAFKA_HEAP_OPTS" = "x" ]; then
+    # export KAFKA_HEAP_OPTS="-Xmx1G -Xms1G"
+  #  fi # change to  export KAFKA_HEAP_OPTS="-Xmx500M -Xms500M"

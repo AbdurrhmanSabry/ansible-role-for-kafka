@@ -1,0 +1,40 @@
+kafka_binaries_url: https://dlcdn.apache.org/kafka/3.1.0/kafka_2.13-3.1.0.tgz
+kafka_binaries_location : /home/ubuntu/kafka_2.13-3.1.0
+directories:
+- zookeeper
+- kafka
+nodes:
+- ip-172-31-34-231
+- ip-172-31-39-95
+- ip-172-31-32-243
+ips_blocks: 
+- | 
+  initLimit=5
+  syncLimit=2
+  tickTime=2000
+  # list of servers
+  server.1=0.0.0.0:2888:3888
+  server.2=172.31.39.95:2888:3888
+  server.3=172.31.32.243:2888:3888
+- |
+  initLimit=5
+  syncLimit=2
+  tickTime=2000
+  # list of servers
+  server.1=172.31.34.231:2888:3888
+  server.2=0.0.0.0:2888:3888
+  server.3=172.31.32.243:2888:3888
+- |
+  initLimit=5
+  syncLimit=2
+  tickTime=2000
+  # list of servers
+  server.1=172.31.34.231:2888:3888
+  server.2=172.31.39.95:2888:3888
+  server.3=0.0.0.0:2888:3888
+ipsOfInstances: 172.31.34.231:2181,172.31.39.95:2181,172.31.32.243:2181
+services:
+- zookeeper.service
+- kafka.service
+ 
+ 
